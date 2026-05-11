@@ -63,6 +63,7 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       SERVICE_NAME: product-service
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +92,7 @@ services:
       INVENTORY_SERVICE_URL: http://inventory-service:8000
       SERVICE_NAME: order-service
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,6 +119,7 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       SERVICE_NAME: inventory-service
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,6 +147,7 @@ services:
       SMTP_PORT: 1025
       SERVICE_NAME: notification-service
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -181,6 +185,7 @@ services:
       JWT_SECRET: super-secret-jwt-key-change-in-prod
       SERVICE_NAME: gateway
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       redis:
         condition: service_healthy
@@ -200,35 +205,39 @@ services:
     networks:
       - backend
 
-  # ── Observability (Phase 4) ────────────────────────────────────
-  # prometheus:
-  #   image: prom/prometheus:v2.52.0
-  #   ports:
-  #     - "9090:9090"
-  #   volumes:
-  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-  #   networks:
-  #     - backend
+  # ── Observability ────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - backend
 
-  # grafana:
-  #   image: grafana/grafana:10.4.2
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     GF_SECURITY_ADMIN_PASSWORD: admin
-  #   volumes:
-  #     - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
-  #     - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
-  #   networks:
-  #     - backend
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - backend
 
-  # jaeger:
-  #   image: jaegertracing/all-in-one:1.57
-  #   ports:
-  #     - "16686:16686"
-  #     - "4317:4317"
-  #   networks:
-  #     - backend
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - backend
 
 volumes:
   postgres_data:

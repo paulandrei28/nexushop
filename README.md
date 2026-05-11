@@ -109,6 +109,9 @@ make clean
 | Notification Service | http://localhost:8004 | Event-driven email notifications |
 | RabbitMQ Management | http://localhost:15672 | Message broker UI (guest/guest) |
 | Mailhog | http://localhost:8025 | Email testing UI |
+| Prometheus | http://localhost:9090 | Metrics collection + queries |
+| Grafana | http://localhost:3000 | Dashboards (admin/admin) |
+| Jaeger | http://localhost:16686 | Distributed tracing UI |
 
 ### API Examples
 
@@ -185,7 +188,16 @@ curl http://localhost:8002/orders/<order-id>
 │   ├── messaging.py            # RabbitMQ connection + helpers
 │   ├── health.py               # Health check blueprint
 │   ├── circuit_breaker.py      # Circuit breaker wrapper
-│   └── logging_config.py       # Structured JSON logging
+│   ├── logging_config.py       # Structured JSON logging
+│   ├── metrics.py              # Prometheus metric definitions
+│   ├── metrics_flask.py        # Flask metrics middleware
+│   ├── metrics_fastapi.py      # FastAPI metrics middleware
+│   ├── tracing.py              # OpenTelemetry tracer setup
+│   ├── tracing_flask.py        # Flask tracing middleware
+│   └── tracing_fastapi.py      # FastAPI tracing middleware
+├── monitoring/                 # Observability configuration
+│   ├── prometheus.yml          # Scrape targets for all services
+│   └── grafana/                # Grafana provisioning + dashboards
 ├── gateway/                    # API Gateway (FastAPI + Redis)
 │   ├── Dockerfile
 │   ├── app/
@@ -217,11 +229,28 @@ curl http://localhost:8002/orders/<order-id>
 └── .github/workflows/          # CI/CD pipelines (Phase 6)
 ```
 
+## Observability
+
+### Metrics (Prometheus + Grafana)
+
+Every service exposes a `/metrics` endpoint with:
+- **Request rate, latency (p50/p95/p99), error rate** per endpoint
+- **Requests in-progress** gauge
+- **Circuit breaker state and failure counts** (gateway)
+- **Events published/consumed** counters (RabbitMQ)
+- **Database query duration** histograms
+
+Prometheus scrapes all 5 services every 15 seconds. Grafana ships with a pre-built **NexuShop Microservices Overview** dashboard (9 panels) auto-provisioned on startup.
+
+### Distributed Tracing (OpenTelemetry + Jaeger)
+
+All services are instrumented with OpenTelemetry and export traces via OTLP/gRPC to Jaeger. Trace context is propagated across service boundaries through HTTP headers, enabling end-to-end request visualization through the gateway, downstream services, and async event handlers.
+
 ## Development Roadmap
 
 - [x] Phase 1: Foundation (infrastructure + Product Service)
 - [x] Phase 2: Core Services (Order + Inventory + event-driven flow)
 - [x] Phase 3: API Gateway + Self-Healing patterns
-- [ ] Phase 4: Observability (Prometheus, Grafana, Jaeger)
+- [x] Phase 4: Observability (Prometheus, Grafana, Jaeger)
 - [ ] Phase 5: Angular Frontend
 - [ ] Phase 6: CI/CD + Load Testing + Polish

@@ -15,6 +15,8 @@ from app.events import start_consumer
 from shared.health import create_health_blueprint
 from shared.logging_config import correlation_id_middleware, setup_logging
 from shared.messaging import RabbitMQConnection
+from shared.metrics_flask import setup_flask_metrics
+from shared.tracing_flask import setup_flask_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,8 @@ def create_app(config_class=Config) -> Flask:
 
     # Register middleware
     correlation_id_middleware(app)
+    setup_flask_metrics(app, app.config.get("SERVICE_NAME", "inventory-service"))
+    setup_flask_tracing(app, app.config.get("SERVICE_NAME", "inventory-service"))
 
     # Register blueprints
     app.register_blueprint(inventory_bp)

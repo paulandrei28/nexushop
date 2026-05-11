@@ -14,6 +14,8 @@ from app.database import init_db
 from app.routes import router as orders_router
 from app.events import start_consumer
 from shared.logging_config import setup_logging
+from shared.metrics_fastapi import PrometheusMiddleware
+from shared.tracing_fastapi import TracingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,8 @@ app = FastAPI(
 )
 
 app.include_router(orders_router)
+app.add_middleware(PrometheusMiddleware, service_name=settings.SERVICE_NAME)
+app.add_middleware(TracingMiddleware, service_name=settings.SERVICE_NAME)
 
 
 @app.get("/health")

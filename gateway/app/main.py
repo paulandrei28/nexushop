@@ -21,6 +21,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from shared.logging_config import setup_logging
+from shared.metrics_fastapi import PrometheusMiddleware
+from shared.tracing_fastapi import TracingMiddleware
 
 setup_logging(settings.SERVICE_NAME, settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -51,6 +53,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(PrometheusMiddleware, service_name=settings.SERVICE_NAME)
+app.add_middleware(TracingMiddleware, service_name=settings.SERVICE_NAME)
 
 
 # ---- Middleware ----

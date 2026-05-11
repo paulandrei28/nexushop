@@ -23,6 +23,7 @@ PUBLIC_PATHS = frozenset(
         "/openapi.json",
         "/redoc",
         "/gateway/circuits",
+        "/metrics",
     }
 )
 
