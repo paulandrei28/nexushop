@@ -167,26 +167,38 @@ services:
     networks:
       - backend
 
-  # gateway:
-  #   build:
-  #     context: ./gateway
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     PRODUCT_SERVICE_URL: http://product-service:8000
-  #     ORDER_SERVICE_URL: http://order-service:8000
-  #     INVENTORY_SERVICE_URL: http://inventory-service:8000
-  #     REDIS_URL: redis://redis:6379/0
-  #     JWT_SECRET: change-me-in-production
-  #     SERVICE_NAME: gateway
-  #     LOG_LEVEL: INFO
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #   restart: on-failure
-  #   networks:
-  #     - backend
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      PRODUCT_SERVICE_URL: http://product-service:8000
+      ORDER_SERVICE_URL: http://order-service:8000
+      INVENTORY_SERVICE_URL: http://inventory-service:8000
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: super-secret-jwt-key-change-in-prod
+      SERVICE_NAME: gateway
+      LOG_LEVEL: INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: on-failure
+    networks:
+      - backend
 
   # ── Observability (Phase 4) ────────────────────────────────────
   # prometheus:

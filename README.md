@@ -102,6 +102,7 @@ make clean
 
 | Service | URL | Description |
 |---|---|---|
+| API Gateway | http://localhost:8000 | Unified entry point (JWT, rate limiting, circuit breakers) |
 | Product Service | http://localhost:8001 | Product CRUD API |
 | Order Service | http://localhost:8002 | Order lifecycle + saga orchestration |
 | Inventory Service | http://localhost:8003 | Stock management + reservations |
@@ -112,6 +113,32 @@ make clean
 ### API Examples
 
 ```bash
+# --- Via API Gateway (port 8000) ---
+# Browse products (public, no auth)
+curl http://localhost:8000/products
+
+# Get a JWT token
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo@nexushop.com"}'
+# Response: {"access_token": "eyJ...", "token_type": "bearer"}
+
+# Use token for protected endpoints
+export TOKEN="eyJ..."
+
+# Place an order (requires auth)
+curl -X POST http://localhost:8000/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"customer_email": "buyer@example.com", "items": [{"product_id": "<id>", "product_name": "Keyboard", "quantity": 2, "unit_price": 49.99}]}'
+
+# Check circuit breaker status
+curl http://localhost:8000/gateway/circuits
+
+# Check your JWT claims
+curl http://localhost:8000/auth/me -H "Authorization: Bearer $TOKEN"
+
+# --- Direct Service Access ---
 # List products
 curl http://localhost:8001/products
 
@@ -159,6 +186,11 @@ curl http://localhost:8002/orders/<order-id>
 │   ├── health.py               # Health check blueprint
 │   ├── circuit_breaker.py      # Circuit breaker wrapper
 │   └── logging_config.py       # Structured JSON logging
+├── gateway/                    # API Gateway (FastAPI + Redis)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py, auth.py, rate_limiter.py, service_proxy.py
+│   └── tests/
 ├── product-service/            # Product catalog (Flask)
 │   ├── Dockerfile
 │   ├── app/
@@ -189,7 +221,7 @@ curl http://localhost:8002/orders/<order-id>
 
 - [x] Phase 1: Foundation (infrastructure + Product Service)
 - [x] Phase 2: Core Services (Order + Inventory + event-driven flow)
-- [ ] Phase 3: API Gateway + Self-Healing patterns
+- [x] Phase 3: API Gateway + Self-Healing patterns
 - [ ] Phase 4: Observability (Prometheus, Grafana, Jaeger)
 - [ ] Phase 5: Angular Frontend
 - [ ] Phase 6: CI/CD + Load Testing + Polish

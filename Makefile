@@ -31,11 +31,13 @@ test: ## Run all unit tests
 	$(COMPOSE) exec product-service pytest tests/ -v
 	$(COMPOSE) exec order-service pytest tests/ -v
 	$(COMPOSE) exec inventory-service pytest tests/ -v
+	$(COMPOSE) exec gateway pytest tests/ -v
 
 test-local: ## Run tests locally (no Docker)
 	cd product-service && python -m pytest tests/ -v
 	cd order-service && python -m pytest tests/ -v
 	cd inventory-service && python -m pytest tests/ -v
+	cd gateway && python -m pytest tests/ -v
 
 lint: ## Run linters (black + flake8)
 	black --check .
@@ -54,6 +56,7 @@ migrate: ## Run database migrations for a service (usage: make migrate SVC=produ
 	$(COMPOSE) exec $(SVC) alembic upgrade head
 
 health: ## Check health of all services
+	@echo "Gateway:" && curl -s http://localhost:8000/health | python -m json.tool || echo "DOWN"
 	@echo "Product Service:" && curl -s http://localhost:8001/health | python -m json.tool || echo "DOWN"
 	@echo "Order Service:" && curl -s http://localhost:8002/health | python -m json.tool || echo "DOWN"
 	@echo "Inventory Service:" && curl -s http://localhost:8003/health | python -m json.tool || echo "DOWN"
