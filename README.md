@@ -103,7 +103,11 @@ make clean
 | Service | URL | Description |
 |---|---|---|
 | Product Service | http://localhost:8001 | Product CRUD API |
+| Order Service | http://localhost:8002 | Order lifecycle + saga orchestration |
+| Inventory Service | http://localhost:8003 | Stock management + reservations |
+| Notification Service | http://localhost:8004 | Event-driven email notifications |
 | RabbitMQ Management | http://localhost:15672 | Message broker UI (guest/guest) |
+| Mailhog | http://localhost:8025 | Email testing UI |
 
 ### API Examples
 
@@ -125,6 +129,23 @@ curl "http://localhost:8001/products?search=keyboard&category=Electronics"
 # Health check
 curl http://localhost:8001/health
 curl http://localhost:8001/ready
+
+# --- Order Flow (Saga Pattern) ---
+# 1. Set inventory for a product
+curl -X POST http://localhost:8003/inventory \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "<product-id>", "quantity": 50}'
+
+# 2. Place an order (triggers saga: order -> reserve -> confirm -> notify)
+curl -X POST http://localhost:8002/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customer_email": "buyer@example.com", "items": [{"product_id": "<product-id>", "product_name": "Keyboard", "quantity": 2, "unit_price": 49.99}]}'
+
+# 3. Check order status (pending -> confirmed/failed)
+curl http://localhost:8002/orders/<order-id>
+
+# 4. Check emails sent (Mailhog UI)
+# Open http://localhost:8025 in your browser
 ```
 
 ## Project Structure
@@ -138,15 +159,26 @@ curl http://localhost:8001/ready
 │   ├── health.py               # Health check blueprint
 │   ├── circuit_breaker.py      # Circuit breaker wrapper
 │   └── logging_config.py       # Structured JSON logging
-├── product-service/            # Product catalog microservice
+├── product-service/            # Product catalog (Flask)
 │   ├── Dockerfile
 │   ├── app/
-│   │   ├── main.py             # Flask app factory
-│   │   ├── models.py           # SQLAlchemy models
-│   │   ├── routes.py           # REST endpoints
-│   │   ├── repository.py       # Data access layer
-│   │   └── config.py           # Configuration
-│   └── tests/                  # pytest suite
+│   │   ├── main.py, models.py, routes.py, repository.py
+│   └── tests/
+├── order-service/              # Order lifecycle + saga (FastAPI)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py, models.py, routes.py, events.py
+│   └── tests/
+├── inventory-service/          # Stock management (Flask)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py, models.py, routes.py, events.py
+│   └── tests/
+├── notification-service/       # Email notifications (FastAPI)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py, events.py, email_sender.py
+│   └── tests/
 ├── scripts/
 │   ├── init-databases.sql      # Creates per-service databases
 │   └── seed_data.py            # Sample product data
@@ -156,7 +188,7 @@ curl http://localhost:8001/ready
 ## Development Roadmap
 
 - [x] Phase 1: Foundation (infrastructure + Product Service)
-- [ ] Phase 2: Core Services (Order + Inventory + event-driven flow)
+- [x] Phase 2: Core Services (Order + Inventory + event-driven flow)
 - [ ] Phase 3: API Gateway + Self-Healing patterns
 - [ ] Phase 4: Observability (Prometheus, Grafana, Jaeger)
 - [ ] Phase 5: Angular Frontend

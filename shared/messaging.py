@@ -32,8 +32,8 @@ class RabbitMQConnection:
                 self._channel = self._connection.channel()
                 self._channel.confirm_delivery()
                 logger.info(
-                    "Connected to RabbitMQ",
-                    extra={"service": self.service_name, "attempt": attempt + 1},
+                    "Connected to RabbitMQ (attempt %d)",
+                    attempt + 1,
                 )
                 return self._channel
             except pika.exceptions.AMQPConnectionError:
@@ -43,7 +43,6 @@ class RabbitMQConnection:
                     wait,
                     attempt + 1,
                     max_retries,
-                    extra={"service": self.service_name},
                 )
                 time.sleep(wait)
 
@@ -94,7 +93,6 @@ class RabbitMQConnection:
             "Published message to %s with key %s",
             exchange,
             routing_key,
-            extra={"service": self.service_name},
         )
 
     def consume(
@@ -116,18 +114,14 @@ class RabbitMQConnection:
                 logger.exception(
                     "Error processing message from %s",
                     queue,
-                    extra={"service": self.service_name},
                 )
                 if not auto_ack:
-                    ch.basic_nack(
-                        delivery_tag=method.delivery_tag, requeue=False
-                    )
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         channel.basic_consume(queue=queue, on_message_callback=_wrapper)
         logger.info(
             "Started consuming from %s",
             queue,
-            extra={"service": self.service_name},
         )
         channel.start_consuming()
 

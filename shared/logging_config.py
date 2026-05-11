@@ -4,7 +4,12 @@ import sys
 import uuid
 from typing import Optional
 
-from flask import g, request
+try:
+    from flask import g, request
+
+    _HAS_FLASK = True
+except ImportError:
+    _HAS_FLASK = False
 
 
 class JSONFormatter(logging.Formatter):
@@ -51,7 +56,9 @@ def setup_logging(service_name: str, level: str = "INFO"):
 
 
 def _get_correlation_id() -> Optional[str]:
-    """Get correlation ID from Flask request context if available."""
+    """Get correlation ID from Flask/context if available."""
+    if not _HAS_FLASK:
+        return None
     try:
         return getattr(g, "correlation_id", None)
     except RuntimeError:
@@ -63,9 +70,7 @@ def correlation_id_middleware(app):
 
     @app.before_request
     def set_correlation_id():
-        g.correlation_id = request.headers.get(
-            "X-Correlation-ID", str(uuid.uuid4())
-        )
+        g.correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
 
     @app.after_request
     def add_correlation_id_header(response):

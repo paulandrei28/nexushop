@@ -51,9 +51,7 @@ def with_fallback(fallback_value: Any):
             try:
                 return func(*args, **kwargs)
             except pybreaker.CircuitBreakerError:
-                logger.warning(
-                    "Circuit open for %s, returning fallback", func.__name__
-                )
+                logger.warning("Circuit open for %s, returning fallback", func.__name__)
                 if callable(fallback_value):
                     return fallback_value()
                 return fallback_value

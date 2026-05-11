@@ -78,78 +78,94 @@ services:
     networks:
       - backend
 
-  # order-service:
-  #   build:
-  #     context: ./order-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8002:8000"
-  #   environment:
-  #     DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/orders_db
-  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-  #     PRODUCT_SERVICE_URL: http://product-service:8000
-  #     INVENTORY_SERVICE_URL: http://inventory-service:8000
-  #     SERVICE_NAME: order-service
-  #     LOG_LEVEL: INFO
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 15s
-  #   restart: on-failure
-  #   networks:
-  #     - backend
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/orders_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PRODUCT_SERVICE_URL: http://product-service:8000
+      INVENTORY_SERVICE_URL: http://inventory-service:8000
+      SERVICE_NAME: order-service
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+    networks:
+      - backend
 
-  # inventory-service:
-  #   build:
-  #     context: ./inventory-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8003:8000"
-  #   environment:
-  #     DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/inventory_db
-  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-  #     SERVICE_NAME: inventory-service
-  #     LOG_LEVEL: INFO
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 15s
-  #   restart: on-failure
-  #   networks:
-  #     - backend
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    ports:
+      - "8003:8000"
+    environment:
+      DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/inventory_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVICE_NAME: inventory-service
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+    networks:
+      - backend
 
-  # notification-service:
-  #   build:
-  #     context: ./notification-service
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8004:8000"
-  #   environment:
-  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-  #     SMTP_HOST: mailhog
-  #     SMTP_PORT: 1025
-  #     SERVICE_NAME: notification-service
-  #     LOG_LEVEL: INFO
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   restart: on-failure
-  #   networks:
-  #     - backend
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    ports:
+      - "8004:8000"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SERVICE_NAME: notification-service
+      LOG_LEVEL: INFO
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+    networks:
+      - backend
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - backend
 
   # gateway:
   #   build:
@@ -199,14 +215,6 @@ services:
   #   ports:
   #     - "16686:16686"
   #     - "4317:4317"
-  #   networks:
-  #     - backend
-
-  # mailhog:
-  #   image: mailhog/mailhog:latest
-  #   ports:
-  #     - "1025:1025"
-  #     - "8025:8025"
   #   networks:
   #     - backend
 

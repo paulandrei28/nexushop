@@ -29,9 +29,13 @@ ps: ## Show running services
 
 test: ## Run all unit tests
 	$(COMPOSE) exec product-service pytest tests/ -v
+	$(COMPOSE) exec order-service pytest tests/ -v
+	$(COMPOSE) exec inventory-service pytest tests/ -v
 
 test-local: ## Run tests locally (no Docker)
 	cd product-service && python -m pytest tests/ -v
+	cd order-service && python -m pytest tests/ -v
+	cd inventory-service && python -m pytest tests/ -v
 
 lint: ## Run linters (black + flake8)
 	black --check .
@@ -51,3 +55,6 @@ migrate: ## Run database migrations for a service (usage: make migrate SVC=produ
 
 health: ## Check health of all services
 	@echo "Product Service:" && curl -s http://localhost:8001/health | python -m json.tool || echo "DOWN"
+	@echo "Order Service:" && curl -s http://localhost:8002/health | python -m json.tool || echo "DOWN"
+	@echo "Inventory Service:" && curl -s http://localhost:8003/health | python -m json.tool || echo "DOWN"
+	@echo "Notification Service:" && curl -s http://localhost:8004/health | python -m json.tool || echo "DOWN"
