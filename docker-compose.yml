@@ -1,0 +1,220 @@
+services:
+  # ── Infrastructure ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce_secret
+      POSTGRES_DB: products_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # ── Microservices ───────────────────────────────────────────────
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/products_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVICE_NAME: product-service
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+    networks:
+      - backend
+
+  # order-service:
+  #   build:
+  #     context: ./order-service
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8002:8000"
+  #   environment:
+  #     DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/orders_db
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  #     PRODUCT_SERVICE_URL: http://product-service:8000
+  #     INVENTORY_SERVICE_URL: http://inventory-service:8000
+  #     SERVICE_NAME: order-service
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 15s
+  #   restart: on-failure
+  #   networks:
+  #     - backend
+
+  # inventory-service:
+  #   build:
+  #     context: ./inventory-service
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8003:8000"
+  #   environment:
+  #     DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/inventory_db
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  #     SERVICE_NAME: inventory-service
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 15s
+  #   restart: on-failure
+  #   networks:
+  #     - backend
+
+  # notification-service:
+  #   build:
+  #     context: ./notification-service
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8004:8000"
+  #   environment:
+  #     RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  #     SMTP_HOST: mailhog
+  #     SMTP_PORT: 1025
+  #     SERVICE_NAME: notification-service
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   restart: on-failure
+  #   networks:
+  #     - backend
+
+  # gateway:
+  #   build:
+  #     context: ./gateway
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     PRODUCT_SERVICE_URL: http://product-service:8000
+  #     ORDER_SERVICE_URL: http://order-service:8000
+  #     INVENTORY_SERVICE_URL: http://inventory-service:8000
+  #     REDIS_URL: redis://redis:6379/0
+  #     JWT_SECRET: change-me-in-production
+  #     SERVICE_NAME: gateway
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   restart: on-failure
+  #   networks:
+  #     - backend
+
+  # ── Observability (Phase 4) ────────────────────────────────────
+  # prometheus:
+  #   image: prom/prometheus:v2.52.0
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks:
+  #     - backend
+
+  # grafana:
+  #   image: grafana/grafana:10.4.2
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   volumes:
+  #     - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+  #     - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+  #   networks:
+  #     - backend
+
+  # jaeger:
+  #   image: jaegertracing/all-in-one:1.57
+  #   ports:
+  #     - "16686:16686"
+  #     - "4317:4317"
+  #   networks:
+  #     - backend
+
+  # mailhog:
+  #   image: mailhog/mailhog:latest
+  #   ports:
+  #     - "1025:1025"
+  #     - "8025:8025"
+  #   networks:
+  #     - backend
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge
