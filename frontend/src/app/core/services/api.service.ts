@@ -64,10 +64,13 @@ export class ApiService {
   // ── Orders ────────────────────────────────────────────
   getOrders(params?: {
     status?: string;
+    customer_email?: string;
     page?: number;
   }): Observable<{ items: Order[]; total: number; page: number; per_page: number }> {
     let httpParams = new HttpParams();
     if (params?.status) httpParams = httpParams.set('status', params.status);
+    if (params?.customer_email)
+      httpParams = httpParams.set('customer_email', params.customer_email);
     if (params?.page) httpParams = httpParams.set('page', params.page.toString());
     return this.http.get<{
       items: Order[];

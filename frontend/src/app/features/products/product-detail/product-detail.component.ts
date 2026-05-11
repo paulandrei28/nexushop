@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { CartService } from '../../../core/services/cart.service';
@@ -193,6 +194,8 @@ export class ProductDetailComponent implements OnInit {
   stock = signal<number | null>(null);
   loading = signal(true);
 
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
@@ -202,23 +205,29 @@ export class ProductDetailComponent implements OnInit {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
-    this.api.getProduct(id).subscribe({
-      next: (product) => {
-        this.product.set(product);
-        this.loading.set(false);
-        this.loadStock(product.id);
-      },
-      error: () => {
-        this.loading.set(false);
-      },
-    });
+    this.api
+      .getProduct(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (product) => {
+          this.product.set(product);
+          this.loading.set(false);
+          this.loadStock(product.id);
+        },
+        error: () => {
+          this.loading.set(false);
+        },
+      });
   }
 
   private loadStock(productId: string): void {
-    this.api.getInventory(productId).subscribe({
-      next: (inv) => this.stock.set(inv.quantity - inv.reserved),
-      error: () => this.stock.set(null),
-    });
+    this.api
+      .getInventory(productId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (inv) => this.stock.set(inv.quantity - inv.reserved),
+        error: () => this.stock.set(null),
+      });
   }
 
   addToCart(): void {

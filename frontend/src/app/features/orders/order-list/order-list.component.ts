@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -123,6 +124,8 @@ export class OrderListComponent implements OnInit {
   orders = signal<Order[]>([]);
   loading = signal(true);
 
+  private destroyRef = inject(DestroyRef);
+
   constructor(
     private api: ApiService,
     public auth: AuthService
@@ -133,15 +136,18 @@ export class OrderListComponent implements OnInit {
       this.loading.set(false);
       return;
     }
-    this.api.getOrders().subscribe({
-      next: (res) => {
-        this.orders.set(res.items);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-      },
-    });
+    this.api
+      .getOrders({ customer_email: this.auth.email()! })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.orders.set(res.items);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+        },
+      });
   }
 
   formatDate(iso: string): string {

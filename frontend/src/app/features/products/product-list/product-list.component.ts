@@ -1,6 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { ApiService } from '../../../core/services/api.service';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -235,7 +238,8 @@ export class ProductListComponent implements OnInit {
   searchQuery = signal('');
   selectedCategory = signal('');
 
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  private destroyRef = inject(DestroyRef);
+  private searchSubject = new Subject<string>();
 
   constructor(
     private api: ApiService,
@@ -246,6 +250,29 @@ export class ProductListComponent implements OnInit {
   ngOnInit(): void {
     this.loadProducts();
     this.loadCategories();
+
+    this.searchSubject
+      .pipe(
+        debounceTime(350),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          const params: { category?: string; search?: string } = {};
+          if (this.selectedCategory()) params.category = this.selectedCategory();
+          if (query) params.search = query;
+          return this.api.getProducts(params);
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: (res) => {
+          this.products.set(res.items);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.notify.error('Failed to load products');
+        },
+      });
   }
 
   loadProducts(): void {
@@ -254,28 +281,33 @@ export class ProductListComponent implements OnInit {
     if (this.selectedCategory()) params.category = this.selectedCategory();
     if (this.searchQuery()) params.search = this.searchQuery();
 
-    this.api.getProducts(params).subscribe({
-      next: (res) => {
-        this.products.set(res.items);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.notify.error('Failed to load products');
-      },
-    });
+    this.api
+      .getProducts(params)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.products.set(res.items);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.notify.error('Failed to load products');
+        },
+      });
   }
 
   loadCategories(): void {
-    this.api.getCategories().subscribe({
-      next: (res) => this.categories.set(res.categories),
-    });
+    this.api
+      .getCategories()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.categories.set(res.categories),
+      });
   }
 
   onSearch(query: string): void {
     this.searchQuery.set(query);
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => this.loadProducts(), 300);
+    this.searchSubject.next(query);
   }
 
   filterByCategory(category: string): void {

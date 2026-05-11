@@ -57,14 +57,17 @@ class OrderCreate(BaseModel):
 @router.get("")
 def list_orders(
     status: Optional[str] = None,
+    customer_email: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
     db: Session = Depends(get_db),
 ):
-    """List orders with optional status filter."""
+    """List orders with optional status and customer_email filter."""
     query = db.query(Order)
     if status:
         query = query.filter(Order.status == status)
+    if customer_email:
+        query = query.filter(Order.customer_email == customer_email)
 
     total = query.count()
     orders = (

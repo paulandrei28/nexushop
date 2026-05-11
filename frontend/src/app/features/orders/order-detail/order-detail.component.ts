@@ -1,6 +1,8 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Order } from '../../../core/models/order.model';
 
 @Component({
@@ -237,27 +239,41 @@ export class OrderDetailComponent implements OnInit {
   order = signal<Order | null>(null);
   loading = signal(true);
   private orderId = '';
+  private destroyRef = inject(DestroyRef);
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService
+    private router: Router,
+    private api: ApiService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
+    if (!this.auth.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
     this.orderId = this.route.snapshot.paramMap.get('id')!;
     this.loadOrder();
   }
 
   loadOrder(): void {
-    this.api.getOrder(this.orderId).subscribe({
-      next: (order) => {
-        this.order.set(order);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-      },
-    });
+    this.api
+      .getOrder(this.orderId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (order) => {
+          if (order.customer_email !== this.auth.email()) {
+            this.order.set(null);
+          } else {
+            this.order.set(order);
+          }
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+        },
+      });
   }
 
   refresh(): void {
