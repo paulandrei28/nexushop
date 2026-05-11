@@ -1,0 +1,9 @@
+{
+  "short_name": "NexuShop",
+  "name": "NexuShop - E-Commerce Platform",
+  "icons": [],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#f9fafb"
+}

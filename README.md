@@ -1,6 +1,6 @@
 # NexuShop - Self-Healing Microservices E-Commerce Platform
 
-A production-grade, event-driven e-commerce backend demonstrating microservices architecture, self-healing patterns, and full observability -- built with Python, Docker Compose, and CI/CD.
+A production-grade, event-driven e-commerce platform demonstrating microservices architecture, self-healing patterns, and full observability -- built with Python, Angular, Docker Compose, and CI/CD.
 
 ## Architecture
 
@@ -51,6 +51,7 @@ graph TB
 | Notification Service | FastAPI | Event-driven email notifications |
 | Messaging | RabbitMQ | Async event bus with dead letter queues |
 | Caching | Redis | Rate limiting, response caching |
+| Frontend | Angular 18 + nginx | Product browsing, cart, checkout, order tracking |
 | Monitoring | Prometheus + Grafana | Metrics and dashboards |
 | Tracing | OpenTelemetry + Jaeger | Distributed request tracing |
 | CI/CD | GitHub Actions | Lint, test, build, integration tests |
@@ -108,6 +109,7 @@ make clean
 | Inventory Service | http://localhost:8003 | Stock management + reservations |
 | Notification Service | http://localhost:8004 | Event-driven email notifications |
 | RabbitMQ Management | http://localhost:15672 | Message broker UI (guest/guest) |
+| Frontend | http://localhost:4200 | Angular storefront |
 | Mailhog | http://localhost:8025 | Email testing UI |
 | Prometheus | http://localhost:9090 | Metrics collection + queries |
 | Grafana | http://localhost:3000 | Dashboards (admin/admin) |
@@ -223,6 +225,10 @@ curl http://localhost:8002/orders/<order-id>
 │   ├── app/
 │   │   ├── main.py, events.py, email_sender.py
 │   └── tests/
+├── frontend/                   # Angular 18 storefront
+│   ├── Dockerfile              # Multi-stage: node build + nginx serve
+│   ├── nginx.conf              # SPA routing + API proxy to gateway
+│   └── src/app/                # Standalone components, signals, lazy routes
 ├── scripts/
 │   ├── init-databases.sql      # Creates per-service databases
 │   └── seed_data.py            # Sample product data
@@ -252,5 +258,5 @@ All services are instrumented with OpenTelemetry and export traces via OTLP/gRPC
 - [x] Phase 2: Core Services (Order + Inventory + event-driven flow)
 - [x] Phase 3: API Gateway + Self-Healing patterns
 - [x] Phase 4: Observability (Prometheus, Grafana, Jaeger)
-- [ ] Phase 5: Angular Frontend
+- [x] Phase 5: Angular Frontend (product browsing, cart, checkout, order tracking)
 - [ ] Phase 6: CI/CD + Load Testing + Polish

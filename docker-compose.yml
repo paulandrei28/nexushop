@@ -205,6 +205,20 @@ services:
     networks:
       - backend
 
+  # ── Frontend ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - backend
+
   # ── Observability ────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.52.0
