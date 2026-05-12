@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from app.extensions import db
-from app.models import InventoryItem, Reservation
+from app.models import InventoryItem, Reservation, StockWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -163,3 +163,68 @@ def release_reservation(order_id):
     db.session.commit()
     logger.info("Released reservations for order %s", order_id)
     return jsonify({"message": "Reservations released", "order_id": order_id}), 200
+
+
+@inventory_bp.route("/batch", methods=["POST"])
+def batch_inventory():
+    """Get inventory for multiple product IDs at once."""
+    data = request.get_json()
+    if not data or "product_ids" not in data:
+        return jsonify({"error": "product_ids array is required"}), 400
+
+    product_ids = data["product_ids"]
+    items = InventoryItem.query.filter(InventoryItem.product_id.in_(product_ids)).all()
+    result = {item.product_id: item.to_dict() for item in items}
+    return jsonify(result), 200
+
+
+@inventory_bp.route("/<product_id>/watch", methods=["POST"])
+def watch_stock(product_id):
+    """Subscribe to stock notifications for a product."""
+    data = request.get_json()
+    if not data or not data.get("email"):
+        return jsonify({"error": "email is required"}), 400
+
+    email = data["email"].strip().lower()
+
+    existing = StockWatcher.query.filter_by(product_id=product_id, email=email).first()
+    if existing:
+        return jsonify(existing.to_dict()), 200
+
+    watcher = StockWatcher(product_id=product_id, email=email)
+    db.session.add(watcher)
+    db.session.commit()
+    logger.info("Stock watcher added: %s for product %s", email, product_id)
+    return jsonify(watcher.to_dict()), 201
+
+
+@inventory_bp.route("/<product_id>/watch", methods=["DELETE"])
+def unwatch_stock(product_id):
+    """Unsubscribe from stock notifications for a product."""
+    data = request.get_json()
+    if not data or not data.get("email"):
+        return jsonify({"error": "email is required"}), 400
+
+    email = data["email"].strip().lower()
+    watcher = StockWatcher.query.filter_by(product_id=product_id, email=email).first()
+    if not watcher:
+        return jsonify({"error": "Not watching this product"}), 404
+
+    db.session.delete(watcher)
+    db.session.commit()
+    logger.info("Stock watcher removed: %s for product %s", email, product_id)
+    return jsonify({"message": "Unsubscribed from stock notifications"}), 200
+
+
+@inventory_bp.route("/<product_id>/watchers", methods=["GET"])
+def list_watchers(product_id):
+    """List watchers for a product (or check if a specific email is watching)."""
+    email = request.args.get("email")
+    if email:
+        watcher = StockWatcher.query.filter_by(
+            product_id=product_id, email=email.strip().lower()
+        ).first()
+        return jsonify({"watching": watcher is not None}), 200
+
+    watchers = StockWatcher.query.filter_by(product_id=product_id).all()
+    return jsonify({"watchers": [w.to_dict() for w in watchers]}), 200

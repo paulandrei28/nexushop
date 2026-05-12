@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Product } from '../../../core/models/product.model';
@@ -53,13 +54,31 @@ import { Product } from '../../../core/models/product.model';
           }
 
           <div class="detail-actions">
-            <button
-              class="btn btn-primary btn-lg"
-              (click)="addToCart()"
-              [disabled]="stock() === 0"
-            >
-              Add to Cart
-            </button>
+            @if (stock() !== 0) {
+              <button
+                class="btn btn-primary btn-lg"
+                (click)="addToCart()"
+                [disabled]="stock() === 0"
+              >
+                Add to Cart
+              </button>
+            } @else {
+              @if (watching()) {
+                <button
+                  class="btn btn-notify-active btn-lg"
+                  (click)="unwatchProduct()"
+                >
+                  Watching - Click to Unsubscribe
+                </button>
+              } @else {
+                <button
+                  class="btn btn-notify btn-lg"
+                  (click)="watchProduct()"
+                >
+                  Notify Me When Available
+                </button>
+              }
+            }
             <a routerLink="/products" class="btn btn-secondary btn-lg">
               Back to Products
             </a>
@@ -178,6 +197,36 @@ import { Product } from '../../../core/models/product.model';
       color: var(--color-gray-400);
     }
 
+    .btn-notify {
+      background: transparent;
+      color: var(--color-primary);
+      border: 1.5px solid var(--color-primary);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-notify:hover {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .btn-notify-active {
+      background: var(--color-success, #16a34a);
+      color: #fff;
+      border: 1.5px solid var(--color-success, #16a34a);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-notify-active:hover {
+      background: var(--color-danger, #dc2626);
+      border-color: var(--color-danger, #dc2626);
+    }
+
     @media (max-width: 768px) {
       .detail-container {
         grid-template-columns: 1fr;
@@ -193,12 +242,14 @@ export class ProductDetailComponent implements OnInit {
   product = signal<Product | null>(null);
   stock = signal<number | null>(null);
   loading = signal(true);
+  watching = signal(false);
 
   private destroyRef = inject(DestroyRef);
 
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
+    private auth: AuthService,
     private cart: CartService,
     private notify: NotificationService
   ) {}
@@ -213,6 +264,7 @@ export class ProductDetailComponent implements OnInit {
           this.product.set(product);
           this.loading.set(false);
           this.loadStock(product.id);
+          this.checkWatchStatus(product.id);
         },
         error: () => {
           this.loading.set(false);
@@ -225,9 +277,50 @@ export class ProductDetailComponent implements OnInit {
       .getInventory(productId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (inv) => this.stock.set(inv.quantity - inv.reserved),
+        next: (inv) => this.stock.set(inv.available),
         error: () => this.stock.set(null),
       });
+  }
+
+  private checkWatchStatus(productId: string): void {
+    const email = this.auth.email();
+    if (!email) return;
+    this.api
+      .isWatchingStock(productId, email)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.watching.set(res.watching),
+        error: () => {},
+      });
+  }
+
+  watchProduct(): void {
+    const p = this.product();
+    const email = this.auth.email();
+    if (!p || !email) {
+      this.notify.error('Please log in to get stock notifications');
+      return;
+    }
+    this.api.watchStock(p.id, email).subscribe({
+      next: () => {
+        this.watching.set(true);
+        this.notify.success('You will be notified when this item is back in stock');
+      },
+      error: () => this.notify.error('Failed to subscribe to notifications'),
+    });
+  }
+
+  unwatchProduct(): void {
+    const p = this.product();
+    const email = this.auth.email();
+    if (!p || !email) return;
+    this.api.unwatchStock(p.id, email).subscribe({
+      next: () => {
+        this.watching.set(false);
+        this.notify.success('Notification removed');
+      },
+      error: () => this.notify.error('Failed to unsubscribe'),
+    });
   }
 
   addToCart(): void {

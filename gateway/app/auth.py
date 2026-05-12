@@ -30,6 +30,11 @@ PUBLIC_PATHS = frozenset(
 # Prefix-based public paths (read-only product browsing)
 PUBLIC_PREFIXES = ("/products",)
 
+# Specific paths that are public regardless of method
+PUBLIC_PATH_METHOD = {
+    "/inventory/batch": ("POST",),
+}
+
 
 def create_token(user_id: str, email: str, role: str = "customer") -> str:
     """Create a JWT token for a user."""
@@ -64,6 +69,12 @@ def _is_public_path(path: str, method: str) -> bool:
         return True
     # Allow GET requests to product browsing endpoints
     if method == "GET" and any(path.startswith(p) for p in PUBLIC_PREFIXES):
+        return True
+    # Allow specific method+path combos (e.g. POST /inventory/batch)
+    if path in PUBLIC_PATH_METHOD and method in PUBLIC_PATH_METHOD[path]:
+        return True
+    # Allow GET on individual inventory items (for product detail page)
+    if method == "GET" and path.startswith("/inventory/"):
         return True
     return False
 

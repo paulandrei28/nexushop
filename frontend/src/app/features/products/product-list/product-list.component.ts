@@ -2,9 +2,10 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
+import { Subject, forkJoin, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { ApiService } from '../../../core/services/api.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { Product } from '../../../core/models/product.model';
@@ -69,7 +70,10 @@ import { Product } from '../../../core/models/product.model';
     @if (!loading() && products().length > 0) {
       <div class="product-grid">
         @for (product of products(); track product.id) {
-          <div class="card product-card">
+          <div class="card product-card" [class.out-of-stock]="isOutOfStock(product.id)">
+            @if (isOutOfStock(product.id)) {
+              <div class="oos-banner">Out of Stock</div>
+            }
             <div class="product-image">
               <span class="product-icon">{{ product.category.charAt(0).toUpperCase() }}</span>
             </div>
@@ -83,12 +87,30 @@ import { Product } from '../../../core/models/product.model';
               </p>
               <div class="product-footer">
                 <span class="product-price">\${{ product.price.toFixed(2) }}</span>
-                <button
-                  class="btn btn-primary btn-sm"
-                  (click)="addToCart(product)"
-                >
-                  Add to Cart
-                </button>
+                @if (!isOutOfStock(product.id)) {
+                  <button
+                    class="btn btn-primary btn-sm"
+                    (click)="addToCart(product)"
+                  >
+                    Add to Cart
+                  </button>
+                } @else {
+                  @if (watchedProducts()[product.id]) {
+                    <button
+                      class="btn btn-notify-active btn-sm"
+                      (click)="unwatchProduct(product.id)"
+                    >
+                      Watching
+                    </button>
+                  } @else {
+                    <button
+                      class="btn btn-notify btn-sm"
+                      (click)="watchProduct(product.id)"
+                    >
+                      Notify Me
+                    </button>
+                  }
+                }
               </div>
             </div>
           </div>
@@ -229,6 +251,61 @@ import { Product } from '../../../core/models/product.model';
       font-weight: 700;
       color: var(--color-gray-900);
     }
+
+    .out-of-stock {
+      filter: grayscale(100%);
+      opacity: 0.75;
+      position: relative;
+    }
+
+    .out-of-stock:hover {
+      filter: grayscale(80%);
+      opacity: 0.85;
+    }
+
+    .oos-banner {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: var(--color-danger, #dc2626);
+      color: #fff;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.625rem;
+      border-radius: 4px;
+      z-index: 2;
+    }
+
+    .btn-notify {
+      background: transparent;
+      color: var(--color-primary);
+      border: 1.5px solid var(--color-primary);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-notify:hover {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .btn-notify-active {
+      background: var(--color-success, #16a34a);
+      color: #fff;
+      border: 1.5px solid var(--color-success, #16a34a);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .btn-notify-active:hover {
+      opacity: 0.85;
+    }
   `],
 })
 export class ProductListComponent implements OnInit {
@@ -237,12 +314,15 @@ export class ProductListComponent implements OnInit {
   loading = signal(true);
   searchQuery = signal('');
   selectedCategory = signal('');
+  stockMap = signal<Record<string, number>>({});
+  watchedProducts = signal<Record<string, boolean>>({});
 
   private destroyRef = inject(DestroyRef);
   private searchSubject = new Subject<string>();
 
   constructor(
     private api: ApiService,
+    public auth: AuthService,
     private cart: CartService,
     private notify: NotificationService
   ) {}
@@ -267,6 +347,7 @@ export class ProductListComponent implements OnInit {
         next: (res) => {
           this.products.set(res.items);
           this.loading.set(false);
+          this.loadInventoryForProducts(res.items);
         },
         error: () => {
           this.loading.set(false);
@@ -288,12 +369,71 @@ export class ProductListComponent implements OnInit {
         next: (res) => {
           this.products.set(res.items);
           this.loading.set(false);
+          this.loadInventoryForProducts(res.items);
         },
         error: () => {
           this.loading.set(false);
           this.notify.error('Failed to load products');
         },
       });
+  }
+
+  private loadInventoryForProducts(products: Product[]): void {
+    if (products.length === 0) return;
+    const ids = products.map((p) => p.id);
+    this.api
+      .getBatchInventory(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (inventoryMap) => {
+          const stock: Record<string, number> = {};
+          for (const product of products) {
+            const inv = inventoryMap[product.id];
+            stock[product.id] = inv ? inv.available : 0;
+          }
+          this.stockMap.set(stock);
+        },
+        error: () => {
+          // If inventory fetch fails, assume all in stock
+          const stock: Record<string, number> = {};
+          for (const product of products) {
+            stock[product.id] = -1;
+          }
+          this.stockMap.set(stock);
+        },
+      });
+  }
+
+  isOutOfStock(productId: string): boolean {
+    const stock = this.stockMap()[productId];
+    return stock !== undefined && stock === 0;
+  }
+
+  watchProduct(productId: string): void {
+    const email = this.auth.email();
+    if (!email) {
+      this.notify.error('Please log in to get stock notifications');
+      return;
+    }
+    this.api.watchStock(productId, email).subscribe({
+      next: () => {
+        this.watchedProducts.update((w) => ({ ...w, [productId]: true }));
+        this.notify.success('You will be notified when this item is back in stock');
+      },
+      error: () => this.notify.error('Failed to subscribe to notifications'),
+    });
+  }
+
+  unwatchProduct(productId: string): void {
+    const email = this.auth.email();
+    if (!email) return;
+    this.api.unwatchStock(productId, email).subscribe({
+      next: () => {
+        this.watchedProducts.update((w) => ({ ...w, [productId]: false }));
+        this.notify.success('Notification removed');
+      },
+      error: () => this.notify.error('Failed to unsubscribe'),
+    });
   }
 
   loadCategories(): void {

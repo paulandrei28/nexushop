@@ -72,3 +72,32 @@ class Reservation(db.Model):
             "status": self.status,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class StockWatcher(db.Model):
+    __tablename__ = "stock_watchers"
+
+    id = db.Column(
+        db.String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    product_id = db.Column(db.String(36), nullable=False, index=True)
+    email = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("product_id", "email", name="uq_watcher_product_email"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "product_id": self.product_id,
+            "email": self.email,
+            "created_at": self.created_at.isoformat(),
+        }

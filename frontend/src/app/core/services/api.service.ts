@@ -55,9 +55,43 @@ export class ApiService {
     product_id: string;
     quantity: number;
     reserved: number;
+    available: number;
   }> {
-    return this.http.get<{ product_id: string; quantity: number; reserved: number }>(
-      `${this.baseUrl}/inventory/${productId}`
+    return this.http.get<{
+      product_id: string;
+      quantity: number;
+      reserved: number;
+      available: number;
+    }>(`${this.baseUrl}/inventory/${productId}`);
+  }
+
+  getBatchInventory(
+    productIds: string[]
+  ): Observable<Record<string, { product_id: string; quantity: number; reserved: number; available: number }>> {
+    return this.http.post<
+      Record<string, { product_id: string; quantity: number; reserved: number; available: number }>
+    >(`${this.baseUrl}/inventory/batch`, { product_ids: productIds });
+  }
+
+  watchStock(productId: string, email: string): Observable<{ id: string; product_id: string; email: string }> {
+    return this.http.post<{ id: string; product_id: string; email: string }>(
+      `${this.baseUrl}/inventory/${productId}/watch`,
+      { email }
+    );
+  }
+
+  unwatchStock(productId: string, email: string): Observable<{ message: string }> {
+    return this.http.request<{ message: string }>(
+      'DELETE',
+      `${this.baseUrl}/inventory/${productId}/watch`,
+      { body: { email } }
+    );
+  }
+
+  isWatchingStock(productId: string, email: string): Observable<{ watching: boolean }> {
+    return this.http.get<{ watching: boolean }>(
+      `${this.baseUrl}/inventory/${productId}/watchers`,
+      { params: new HttpParams().set('email', email) }
     );
   }
 
