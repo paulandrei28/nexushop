@@ -14,6 +14,7 @@ graph TB
     GW --> PS[Product Service<br/>Flask + PostgreSQL]
     GW --> OS[Order Service<br/>FastAPI + PostgreSQL]
     GW --> IS[Inventory Service<br/>Flask + PostgreSQL]
+    GW --> US[User Service<br/>Flask + PostgreSQL]
 
     OS -- order.created --> RMQ[(RabbitMQ)]
     RMQ -- inventory.reserve --> IS
@@ -24,6 +25,7 @@ graph TB
     PS --> PG[(PostgreSQL<br/>products_db)]
     OS --> PG2[(PostgreSQL<br/>orders_db)]
     IS --> PG3[(PostgreSQL<br/>inventory_db)]
+    US --> PG4[(PostgreSQL<br/>users_db)]
 
     subgraph Observability
         PROM[Prometheus]
@@ -45,6 +47,7 @@ graph TB
 | Layer | Technology | Purpose |
 |---|---|---|
 | API Gateway | FastAPI + Redis | Routing, JWT auth, rate limiting |
+| User Service | Flask + PostgreSQL | Registration, login, JWT authentication |
 | Product Service | Flask + PostgreSQL | Product catalog CRUD |
 | Order Service | FastAPI + PostgreSQL | Order lifecycle, saga pattern |
 | Inventory Service | Flask + PostgreSQL | Stock management |
@@ -108,6 +111,7 @@ make clean
 | Order Service | http://localhost:8002 | Order lifecycle + saga orchestration |
 | Inventory Service | http://localhost:8003 | Stock management + reservations |
 | Notification Service | http://localhost:8004 | Event-driven email notifications |
+| User Service | http://localhost:8005 | User registration + login + JWT |
 | RabbitMQ Management | http://localhost:15672 | Message broker UI (guest/guest) |
 | Frontend | http://localhost:4200 | Angular storefront |
 | Mailhog | http://localhost:8025 | Email testing UI |
@@ -122,11 +126,16 @@ make clean
 # Browse products (public, no auth)
 curl http://localhost:8000/products
 
-# Get a JWT token
+# Register a new account
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo@nexushop.com", "password": "password123", "name": "Demo User"}'
+
+# Login with credentials
 curl -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "demo@nexushop.com"}'
-# Response: {"access_token": "eyJ...", "token_type": "bearer"}
+  -d '{"email": "demo@nexushop.com", "password": "password123"}'
+# Response: {"access_token": "eyJ...", "token_type": "bearer", "user": {...}}
 
 # Use token for protected endpoints
 export TOKEN="eyJ..."
@@ -224,6 +233,11 @@ curl http://localhost:8002/orders/<order-id>
 │   ├── Dockerfile
 │   ├── app/
 │   │   ├── main.py, events.py, email_sender.py
+│   └── tests/
+├── user-service/               # User auth (Flask + bcrypt)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── main.py, models.py, routes.py
 │   └── tests/
 ├── frontend/                   # Angular 18 storefront
 │   ├── Dockerfile              # Multi-stage: node build + nginx serve

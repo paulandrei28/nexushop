@@ -37,12 +37,13 @@ import { CartService } from '../../../core/services/cart.service';
 
         <div class="navbar-actions">
           @if (auth.isLoggedIn()) {
-            <span class="user-email">{{ auth.email() }}</span>
+            <span class="user-name">{{ auth.name() || auth.email() }}</span>
             <button class="btn btn-secondary btn-sm" (click)="auth.logout()">
               Logout
             </button>
           } @else {
-            <a routerLink="/login" class="btn btn-primary btn-sm">Login</a>
+            <a routerLink="/login" class="btn btn-secondary btn-sm">Sign In</a>
+            <a routerLink="/register" class="btn btn-primary btn-sm">Register</a>
           }
         </div>
       </div>
@@ -136,9 +137,10 @@ import { CartService } from '../../../core/services/cart.service';
       gap: 0.75rem;
     }
 
-    .user-email {
+    .user-name {
       font-size: 0.8125rem;
       color: var(--color-gray-500);
+      font-weight: 500;
     }
   `],
 })

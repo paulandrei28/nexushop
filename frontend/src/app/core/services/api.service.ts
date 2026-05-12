@@ -97,10 +97,33 @@ export class ApiService {
   }
 
   // ── Auth ──────────────────────────────────────────────
-  login(email: string): Observable<{ access_token: string; token_type: string }> {
-    return this.http.post<{ access_token: string; token_type: string }>(
-      `${this.baseUrl}/auth/login`,
-      { email }
-    );
+  login(
+    email: string,
+    password: string
+  ): Observable<{ access_token: string; token_type: string; user: AuthUser }> {
+    return this.http.post<{
+      access_token: string;
+      token_type: string;
+      user: AuthUser;
+    }>(`${this.baseUrl}/auth/login`, { email, password });
   }
+
+  register(
+    email: string,
+    password: string,
+    name: string
+  ): Observable<{ access_token: string; token_type: string; user: AuthUser }> {
+    return this.http.post<{
+      access_token: string;
+      token_type: string;
+      user: AuthUser;
+    }>(`${this.baseUrl}/auth/register`, { email, password, name });
+  }
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
 }

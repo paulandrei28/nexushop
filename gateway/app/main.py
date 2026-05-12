@@ -32,6 +32,7 @@ ROUTE_MAP = {
     "/products": "products",
     "/orders": "orders",
     "/inventory": "inventory",
+    "/auth": "users",
 }
 
 
@@ -116,28 +117,7 @@ async def ready():
     }
 
 
-@app.post("/auth/login")
-async def login(request: Request):
-    """Issue a JWT token (demo endpoint - no real user store)."""
-    from app.auth import create_token
-
-    body = await request.json()
-    email = body.get("email")
-    if not email:
-        return JSONResponse(status_code=400, content={"error": "email is required"})
-    user_id = body.get("user_id", str(uuid.uuid4()))
-    role = body.get("role", "customer")
-    token = create_token(user_id, email, role)
-    return {"access_token": token, "token_type": "bearer"}
-
-
-@app.get("/auth/me")
-async def me(request: Request):
-    """Return the current user's claims from their JWT."""
-    user = getattr(request.state, "user", None)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-    return user
+# Auth routes (/auth/login, /auth/register, /auth/me) are proxied to user-service
 
 
 @app.get("/gateway/circuits")

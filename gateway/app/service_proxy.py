@@ -88,11 +88,13 @@ class AsyncCircuitBreaker:
 product_cb = AsyncCircuitBreaker("product-service")
 order_cb = AsyncCircuitBreaker("order-service")
 inventory_cb = AsyncCircuitBreaker("inventory-service")
+user_cb = AsyncCircuitBreaker("user-service")
 
 SERVICE_MAP = {
     "products": (settings.PRODUCT_SERVICE_URL, product_cb),
     "orders": (settings.ORDER_SERVICE_URL, order_cb),
     "inventory": (settings.INVENTORY_SERVICE_URL, inventory_cb),
+    "users": (settings.USER_SERVICE_URL, user_cb),
 }
 
 # Shared async HTTP client

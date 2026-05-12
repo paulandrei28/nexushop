@@ -11,6 +11,7 @@ class Settings:
     INVENTORY_SERVICE_URL: str = os.environ.get(
         "INVENTORY_SERVICE_URL", "http://localhost:8003"
     )
+    USER_SERVICE_URL: str = os.environ.get("USER_SERVICE_URL", "http://localhost:8005")
     REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     JWT_SECRET: str = os.environ.get("JWT_SECRET", "change-me-in-production")
     JWT_ALGORITHM: str = "HS256"

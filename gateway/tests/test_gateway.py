@@ -26,25 +26,52 @@ async def test_ready(client):
     assert "circuit_breakers" in data
 
 
-# ---- Auth ----
+# ---- Auth (proxied to user-service) ----
 
 
 @pytest.mark.anyio
-async def test_login(client):
-    resp = await client.post(
-        "/auth/login",
-        json={"email": "test@example.com", "user_id": "u1"},
+async def test_login_proxied(client):
+    """POST /auth/login should be proxied to user-service."""
+    mock_resp = httpx.Response(
+        200, json={"access_token": "tok", "token_type": "bearer"}
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+    with patch(
+        "app.service_proxy._forward_request",
+        new_callable=AsyncMock,
+        return_value=mock_resp,
+    ):
+        resp = await client.post(
+            "/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        )
+        assert resp.status_code == 200
 
 
 @pytest.mark.anyio
-async def test_login_missing_email(client):
-    resp = await client.post("/auth/login", json={"user_id": "u1"})
-    assert resp.status_code == 400
+async def test_register_proxied(client):
+    """POST /auth/register should be proxied to user-service."""
+    mock_resp = httpx.Response(
+        201,
+        json={
+            "access_token": "tok",
+            "token_type": "bearer",
+            "user": {"email": "test@example.com"},
+        },
+    )
+    with patch(
+        "app.service_proxy._forward_request",
+        new_callable=AsyncMock,
+        return_value=mock_resp,
+    ):
+        resp = await client.post(
+            "/auth/register",
+            json={
+                "email": "test@example.com",
+                "password": "password123",
+                "name": "Test",
+            },
+        )
+        assert resp.status_code == 201
 
 
 def test_create_and_decode_token():
@@ -116,17 +143,23 @@ async def test_protected_endpoint_with_valid_token(client):
         assert resp.status_code == 201
 
 
-# ---- Auth /me endpoint ----
+# ---- Auth /me endpoint (proxied to user-service) ----
 
 
 @pytest.mark.anyio
 async def test_auth_me_with_token(client):
+    """GET /auth/me with valid JWT should be proxied to user-service."""
     token = create_token("u1", "test@example.com", "admin")
-    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["sub"] == "u1"
-    assert data["role"] == "admin"
+    mock_resp = httpx.Response(200, json={"email": "test@example.com", "role": "admin"})
+    with patch(
+        "app.service_proxy._forward_request",
+        new_callable=AsyncMock,
+        return_value=mock_resp,
+    ):
+        resp = await client.get(
+            "/auth/me", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200
 
 
 @pytest.mark.anyio

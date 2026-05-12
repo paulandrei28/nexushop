@@ -5,6 +5,7 @@ os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 os.environ["PRODUCT_SERVICE_URL"] = "http://product-service:8000"
 os.environ["ORDER_SERVICE_URL"] = "http://order-service:8000"
 os.environ["INVENTORY_SERVICE_URL"] = "http://inventory-service:8000"
+os.environ["USER_SERVICE_URL"] = "http://user-service:8000"
 
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -29,9 +30,9 @@ async def client():
     rl_mod._redis_pool = None
 
     # Reset circuit breakers between tests
-    from app.service_proxy import product_cb, order_cb, inventory_cb
+    from app.service_proxy import product_cb, order_cb, inventory_cb, user_cb
 
-    for cb in (product_cb, order_cb, inventory_cb):
+    for cb in (product_cb, order_cb, inventory_cb, user_cb):
         cb._fail_counter = 0
         cb._state = cb._state.__class__("closed")
 

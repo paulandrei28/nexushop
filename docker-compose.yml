@@ -163,6 +163,31 @@ services:
     networks:
       - backend
 
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    ports:
+      - "8005:8000"
+    environment:
+      DATABASE_URL: postgresql://ecommerce:ecommerce_secret@postgres:5432/users_db
+      JWT_SECRET: super-secret-jwt-key-change-in-prod
+      SERVICE_NAME: user-service
+      LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: on-failure
+    networks:
+      - backend
+
   mailhog:
     image: mailhog/mailhog:latest
     ports:
@@ -181,6 +206,7 @@ services:
       PRODUCT_SERVICE_URL: http://product-service:8000
       ORDER_SERVICE_URL: http://order-service:8000
       INVENTORY_SERVICE_URL: http://inventory-service:8000
+      USER_SERVICE_URL: http://user-service:8000
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: super-secret-jwt-key-change-in-prod
       SERVICE_NAME: gateway
@@ -194,6 +220,8 @@ services:
       order-service:
         condition: service_healthy
       inventory-service:
+        condition: service_healthy
+      user-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
