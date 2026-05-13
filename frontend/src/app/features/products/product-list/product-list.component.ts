@@ -392,6 +392,7 @@ export class ProductListComponent implements OnInit {
             stock[product.id] = inv ? inv.available : 0;
           }
           this.stockMap.set(stock);
+          this.sortProductsByStock(stock);
         },
         error: () => {
           // If inventory fetch fails, assume all in stock
@@ -402,6 +403,15 @@ export class ProductListComponent implements OnInit {
           this.stockMap.set(stock);
         },
       });
+  }
+
+  private sortProductsByStock(stock: Record<string, number>): void {
+    const sorted = [...this.products()].sort((a, b) => {
+      const aOos = stock[a.id] === 0 ? 1 : 0;
+      const bOos = stock[b.id] === 0 ? 1 : 0;
+      return aOos - bOos;
+    });
+    this.products.set(sorted);
   }
 
   isOutOfStock(productId: string): boolean {
